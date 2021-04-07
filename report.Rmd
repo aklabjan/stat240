@@ -16,14 +16,17 @@ Describe the question or questions of interest and the motivation for the analys
 Conclude the introduction with a thesis statement.
 A thesis statement comprises one or two declarative sentences that summarize the main point of the report and clearly makes an assertion and communicates to the reader the position the authors have taken on the topic
 
+Thesis: What platform is overall the best? (options,rating,variability)
+
 ## Background
 
 ```{r read data}
-data <- read_csv("../data/streamingPlatforms.csv") %>%
+data <- read_csv("streamingPlatforms.csv") %>%
   rename(RottenTomatoes = `Rotten Tomatoes`,
          PrimeVideo = `Prime Video`,
          DisneyPlus = `Disney+`) %>%
   select(-ID)
+data %>% head()
 ```
 Describe the data set, how it was collected, what the variables mean.
 Cite the source of your data.
@@ -32,19 +35,14 @@ Describe any unusual factors which may affect interpretation of results.
 Describe what you intend to do in the rest of the report.
 
 ## Analysis
-Include numerical and graphical summaries of the data. Be sure to introduce and describe your summaries.
-Make sure to include at least one graphical display of the data that best supports your main conclusions for each of your primary questions, and explain how it/they support(s) your conclusions.
-For each inference you make, briefly describe the method you use and what the results are.
-Provide evidence to support each of your claims.
-This section should not include substantial interpretation of results. Leave that for the discussion.
 
-```{r Titles Included}
+Our data includes information for 16,744 movies and shows. 
+```{r Titles}
 data %>% 
   distinct(Title) %>%
   count()
 ```
-Our data includes information for 16,744 movies and shows. 
-
+In order to find the number of titles available to stream on each streaming platform, the data had to be manipulated to pivot_longer and summed over each column by platform.
 ```{r Option Available Per Streaming Service}
 data %>% 
   select(Netflix,Hulu,PrimeVideo,DisneyPlus) %>%
@@ -59,6 +57,124 @@ data %>%
   ylab("Number of Streaming Options") +
   ggtitle("Number of Streaming Options Available by Steaming Platform")
 ```
+PrimeVideo has the most available option to stream with 12,354 title available. Netflix	is next closes with 3560, then Hulu with 903 and lastly Disney+ with 564.
+
+In order to find the proportion of titles available per age category per streaming platform the data had to be summarized, mutated and pivoted. 
+```{r Age Availability Per Streaming Service}
+data %>% 
+  group_by(Age) %>%
+  summarize(Netflix = sum(Netflix),
+            Hulu = sum(Hulu),
+            PrimeVideo = sum(PrimeVideo),
+            DisneyPlus = sum(DisneyPlus)) %>%
+  pivot_longer(c(Netflix,Hulu,PrimeVideo,DisneyPlus),names_to="platform",values_to = "numMovies") %>%
+  group_by(platform) %>%
+  mutate(movies = sum(numMovies),
+         prop = numMovies/movies) %>%
+  ggplot(aes(x=Age, y=prop, fill = platform)) +
+  geom_col() +
+  xlab("Streaming Recommended Age") +
+  ylab("Proportion of Available Titles") +
+  facet_wrap(~platform)
+```
+Netflix has the highest percentage of movies aimed towards kids 7+. Hulu has the highest percentage of movies aimed towards adults age 18+. Netflix, Prime Video and Hulu have a good proportion of streaming options that have no age categorized to them.
+
+In order to see if there is any relationship between RottenTomatos and IMDB rating the Rotten Tomatoes entry had to be transformed from a string to an integer. 
+```{r Rotten Tomatoe vs IMDB rating}
+data %>% 
+  mutate(RottenTomatoes = as.integer(substr(RottenTomatoes,1,nchar(RottenTomatoes)-1)))   %>%
+  select(RottenTomatoes,IMDb) %>%
+  drop_na() %>%
+  ggplot(aes(x=IMDb,y=RottenTomatoes)) +
+  geom_point() +
+  geom_smooth()
+```
+All though there is a wide range of data points above and below the line, there does appear to be a positive correlation between IMDB and Rotten Tomatoes rating. 
+
+In order to determine which platforms are best for viewing shows from certain years, the data had to be grouped, summarized then mutated. 
+```{r Year Availability Per Streaming Service}
+data %>% 
+  group_by(Year) %>%
+  summarize(Netflix = sum(Netflix),
+            Hulu = sum(Hulu),
+            PrimeVideo = sum(PrimeVideo),
+            DisneyPlus = sum(DisneyPlus)) %>%
+  pivot_longer(c(Netflix,Hulu,PrimeVideo,DisneyPlus),names_to="platform",values_to = "numMovies") %>%
+  ggplot(aes(x=Year,y=numMovies,fill = platform)) +
+  geom_col() +
+  xlab("Year Released") +
+  ylab("Number of Movies") +
+  facet_wrap(~platform)
+```
+When looking at the graph, it can be seen that Prime Video has a vast selection of streaming options from pre-2000 unlike Netflix and Hulu who can be seen have most of there content from the last 15 years or so with limited options from pre-2000. Disney+ on the otherhand appears to have a relatively even amount of streaming options from each year. 
+
+In order to plot the runtime of steaming options on each platform, the data had to first be filtered for each platform then drop missing information.
+```{r, include=FALSE}
+Hulu <- data %>%
+  filter(Hulu == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+Netflix <- data %>%
+  filter(Netflix == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+PrimeVideo <- data %>%
+  filter(PrimeVideo == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+Disney <- data %>%
+  filter(DisneyPlus == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+```
+
+```{r Runtime by Platform}
+ggplot(Hulu,aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on Hulu")
+
+ggplot(PrimeVideo,aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on PrimeVideo")
+
+ggplot(Disney, aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on Disney+")
+
+ggplot(Netflix, aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on Netflix")
+
+```
+When looking at the boxplots, you see that the middle 50% appears to be pretty similar for each platform but the outliers for runtime very greatly by platform.
+```{r, include=FALSE}
+Hulu <- Hulu %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "Hulu")
+Netflix <- Netflix %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "Netflix")
+Disney <- Disney %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "Disney+")
+PrimeVideo <- PrimeVideo %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "PrimeVideo")
+```
+
+```{r Runtime Stats by Platform}
+rbind(Netflix,PrimeVideo,Disney,Hulu) %>% select(platform,everything())
+```
+It does not appear that one platform tends to have shorter runtimes over another. 
+
 ## Discussion
 Provide broader interpretations of your analysis and describe how to interpret your results with respect to your questions of interest.
 Discuss any potential short-comings of the analysis.
