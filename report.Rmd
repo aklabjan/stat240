@@ -1,0 +1,69 @@
+---
+title: "Streaming Platforms Report"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE)
+library(tidyverse)
+library(lubridate)
+source("../scripts/viridis.R")
+source("../scripts/ggprob.R")
+```
+
+## Introduction
+Describe the question or questions of interest and the motivation for the analysis.
+Conclude the introduction with a thesis statement.
+A thesis statement comprises one or two declarative sentences that summarize the main point of the report and clearly makes an assertion and communicates to the reader the position the authors have taken on the topic
+
+## Background
+
+```{r read data}
+data <- read_csv("../data/streamingPlatforms.csv") %>%
+  rename(RottenTomatoes = `Rotten Tomatoes`,
+         PrimeVideo = `Prime Video`,
+         DisneyPlus = `Disney+`) %>%
+  select(-ID)
+```
+Describe the data set, how it was collected, what the variables mean.
+Cite the source of your data.
+Describe any background information needed to better comprehend the question or questions you are posing and how the data relate to the question.
+Describe any unusual factors which may affect interpretation of results.
+Describe what you intend to do in the rest of the report.
+
+## Analysis
+Include numerical and graphical summaries of the data. Be sure to introduce and describe your summaries.
+Make sure to include at least one graphical display of the data that best supports your main conclusions for each of your primary questions, and explain how it/they support(s) your conclusions.
+For each inference you make, briefly describe the method you use and what the results are.
+Provide evidence to support each of your claims.
+This section should not include substantial interpretation of results. Leave that for the discussion.
+
+```{r Titles Included}
+data %>% 
+  distinct(Title) %>%
+  count()
+```
+Our data includes information for 16,744 movies and shows. 
+
+```{r Option Available Per Streaming Service}
+data %>% 
+  select(Netflix,Hulu,PrimeVideo,DisneyPlus) %>%
+  summarize(Netflix = sum(Netflix),
+            Hulu = sum(Hulu),
+            PrimeVideo = sum(PrimeVideo),
+            DisneyPlus = sum(DisneyPlus)) %>%
+  pivot_longer(c(Netflix,Hulu,PrimeVideo,DisneyPlus),names_to="platform",values_to = "numMovies") %>%
+  ggplot(aes(x=platform, y =numMovies)) +
+  geom_col() +
+  xlab("Streaming Platform") +
+  ylab("Number of Streaming Options") +
+  ggtitle("Number of Streaming Options Available by Steaming Platform")
+```
+## Discussion
+Provide broader interpretations of your analysis and describe how to interpret your results with respect to your questions of interest.
+Discuss any potential short-comings of the analysis.
+Discuss potential future directions for additional work
+New questions
+Different methods to address the same questions
+New data you might collect to refine your understanding
+Summarize your primary conclusions and the primary evidence that supports these conclusions.
