@@ -81,8 +81,9 @@ Netflix has the highest percentage of movies aimed towards kids 7+. Hulu has the
 
 In order to see if there is any relationship between RottenTomatos and IMDB rating the Rotten Tomatoes entry had to be transformed from a string to an integer. 
 ```{r Rotten Tomatoe vs IMDB rating}
+data <- data %>% 
+  mutate(RottenTomatoes = as.integer(substr(RottenTomatoes,1,nchar(RottenTomatoes)-1)))
 data %>% 
-  mutate(RottenTomatoes = as.integer(substr(RottenTomatoes,1,nchar(RottenTomatoes)-1)))   %>%
   select(RottenTomatoes,IMDb) %>%
   drop_na() %>%
   ggplot(aes(x=IMDb,y=RottenTomatoes)) +
@@ -90,6 +91,40 @@ data %>%
   geom_smooth()
 ```
 All though there is a wide range of data points above and below the line, there does appear to be a positive correlation between IMDB and Rotten Tomatoes rating. 
+
+$$
+\hat{y}_i = -38.89066 + 16.36364 x_i
+$$ 
+```{r Rotten Tomatoe vs IMDB rating correlation}
+data1 <- data %>% 
+  select(RottenTomatoes,IMDb) %>%
+  drop_na()
+
+mx = mean(data1$IMDb)
+my = mean(data1$RottenTomatoes)
+sx = sd(data1$IMDb)
+sy = sd(data1$RottenTomatoes)
+r = cor(data1$IMDb,data1$RottenTomatoes)
+r
+b1_hat <- r *sy/sx
+b1_hat
+b0_hat <- my - b1_hat*mx
+b0_hat
+
+lm1 <- lm(RottenTomatoes ~ IMDb, data = data1)
+library(modelr)
+data1 <- data1 %>%
+  add_residuals(lm1) %>%
+  add_predictions(lm1)
+
+ggplot(data1, aes(x=IMDb, y=resid)) +
+  geom_point() +
+  xlab("IMDb") +
+  ylab("Residual (RottenTomatoe)") +
+  scale_x_log10() +
+  geom_hline(aes(yintercept = 0), color = "red", linetype = "dashed")
+```
+After looking at the residual plot thought there appears to be a better association between IMDb and Rotten Tomatoe rating then linear since the residual plot has a negative correlation. 
 
 In order to determine which platforms are best for viewing shows from certain years, the data had to be grouped, summarized then mutated. 
 ```{r Year Availability Per Streaming Service}
