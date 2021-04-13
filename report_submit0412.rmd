@@ -1,0 +1,260 @@
+---
+title: "Streaming Platforms Report"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE)
+library(tidyverse)
+library(lubridate)
+source("../scripts/viridis.R")
+source("../scripts/ggprob.R")
+```
+
+## Introduction
+There are multiple streaming platforms available. Popular platforms include Netflix, Hulu, Prime Video and DisneyPlus. What platform is overall the best? We consider multiple factors to evaluate the “best” here, including the number of movies available toward all people and different target age groups, and the percent of movies created in different time period, runtime. The answer will be different depending on how we value different factors. In general, Prime video is the best streaming platform. However, some other streaming platforms will be best in different specific fields.
+
+## Background
+The data comprises a comprehensive list of movies available on various streaming platforms. It includes information fro 16744 movies and shows. Platforms in the data only include Netflix, Hulu, Prime Video and DisneyPlus.
+
+A more detailed description of the information provided will be shown below.
+
+1.Title: the name of movie or show.
+
+2. Year: The year in which the movie was produced.
+
+3. Age: Target age group including 7+, 13+, 16+, 18+ and for all people.
+
+4. IMDb: IMDb rating.
+
+5. Rotten Tomatoes: rating of Rotten Tomatoes.
+
+6. Netflix: Whether the movie is found on Netflix.
+
+7. Hulu: Whether the movie is found on Hulu.
+
+8. Prime Video: Whether the movie is found on Prime Video.
+
+9. Disney+: Whether the movie is found on Disney+.
+
+10. Directors: Directors of the movies or shows.
+
+11. Genres: Genres of the movies or shows.
+
+12. Country: Countries where movies are made.
+
+13. Language: The language used in movies
+
+14. Runtime: the time between the starting of the movie up to the end of the credits scene.
+
+The data is from Kaggle. Its link is: https://www.kaggle.com/ruchi798/movies-on-netflix-prime-video-hulu-and-disney
+
+One unusual factors is that the dataset only include the four streaming platforms. Since we measure the best platform based on different factors, there will be multiple best platforms in general, in a specific age group, or in any other  specific filed. But only four platforms here is limited.
+
+As discussed in the introduction, we want to find the best platform. However, multiple factors will influence our measurement. So, we cannot say one specific platform is best in every filed. Instead, we will claim potential factors first, then find the best platform based on different factors included in the measurement. Currently, potential factors includes the number of movies available toward all people and different target age groups, and the percent of movies created in different time period, runtime.
+
+
+```{r read data}
+data <- read_csv("streamingPlatforms.csv") %>%
+  rename(RottenTomatoes = `Rotten Tomatoes`,
+         PrimeVideo = `Prime Video`,
+         DisneyPlus = `Disney+`) %>%
+  select(-ID)
+data %>% head()
+```
+
+
+## Analysis
+
+Our data includes information for 16,744 movies and shows. 
+```{r Titles}
+data %>% 
+  distinct(Title) %>%
+  count()
+```
+In order to find the number of titles available to stream on each streaming platform, the data had to be manipulated to pivot_longer and summed over each column by platform.
+```{r Option Available Per Streaming Service}
+data %>% 
+  select(Netflix,Hulu,PrimeVideo,DisneyPlus) %>%
+  summarize(Netflix = sum(Netflix),
+            Hulu = sum(Hulu),
+            PrimeVideo = sum(PrimeVideo),
+            DisneyPlus = sum(DisneyPlus)) %>%
+  pivot_longer(c(Netflix,Hulu,PrimeVideo,DisneyPlus),names_to="platform",values_to = "numMovies") %>%
+  ggplot(aes(x=platform, y =numMovies)) +
+  geom_col() +
+  xlab("Streaming Platform") +
+  ylab("Number of Streaming Options") +
+  ggtitle("Number of Streaming Options Available by Steaming Platform")
+```
+
+PrimeVideo has the most available options to stream with 12,354 titles available. Netflix	is next closest with 3560, then Hulu with 903 and lastly Disney+ with 564.
+
+In order to find the proportion of titles available per age category per streaming platform, the data had to be summarized, mutated and pivoted. 
+```{r Age Availability Per Streaming Service}
+data %>% 
+  group_by(Age) %>%
+  summarize(Netflix = sum(Netflix),
+            Hulu = sum(Hulu),
+            PrimeVideo = sum(PrimeVideo),
+            DisneyPlus = sum(DisneyPlus)) %>%
+  pivot_longer(c(Netflix,Hulu,PrimeVideo,DisneyPlus),names_to="platform",values_to = "numMovies") %>%
+  group_by(platform) %>%
+  mutate(movies = sum(numMovies),
+         prop = numMovies/movies) %>%
+  ggplot(aes(x=Age, y=prop, fill = platform)) +
+  geom_col() +
+  xlab("Streaming Recommended Age") +
+  ylab("Proportion of Available Titles") +
+  facet_wrap(~platform)
+```
+
+Netflix has the highest percentage of movies aimed towards kids 7+. Hulu has the highest percentage of movies aimed towards adults age 18+. Netflix, Prime Video and Hulu have a good proportion of streaming options that have no age categorized to them.
+
+In order to see if there is any relationship between RottenTomatos and IMDB rating the Rotten Tomatoes entry had to be transformed from a string to an integer. 
+```{r Rotten Tomatoe vs IMDB rating}
+data <- data %>% 
+  mutate(RottenTomatoes = as.integer(substr(RottenTomatoes,1,nchar(RottenTomatoes)-1)))
+data %>% 
+  select(RottenTomatoes,IMDb) %>%
+  drop_na() %>%
+  ggplot(aes(x=IMDb,y=RottenTomatoes)) +
+  geom_point() +
+  geom_smooth()
+```
+
+All though there is a wide range of data points above and below the line, there does appear to be a positive correlation between IMDB and Rotten Tomatoes rating. 
+
+$$
+\hat{y}_i = -38.89066 + 16.36364 x_i
+$$ 
+```{r Rotten Tomatoe vs IMDB rating correlation}
+data1 <- data %>% 
+  select(RottenTomatoes,IMDb) %>%
+  drop_na()
+
+mx = mean(data1$IMDb)
+my = mean(data1$RottenTomatoes)
+sx = sd(data1$IMDb)
+sy = sd(data1$RottenTomatoes)
+r = cor(data1$IMDb,data1$RottenTomatoes)
+r
+b1_hat <- r *sy/sx
+b1_hat
+b0_hat <- my - b1_hat*mx
+b0_hat
+
+lm1 <- lm(RottenTomatoes ~ IMDb, data = data1)
+library(modelr)
+data1 <- data1 %>%
+  add_residuals(lm1) %>%
+  add_predictions(lm1)
+
+ggplot(data1, aes(x=IMDb, y=resid)) +
+  geom_point() +
+  xlab("IMDb") +
+  ylab("Residual (RottenTomatoes)") +
+  scale_x_log10() +
+  geom_hline(aes(yintercept = 0), color = "red", linetype = "dashed")
+```
+
+After looking at the residual plot though, there appears to be a better association between IMDb and Rotten Tomatoes rating than linear since the residual plot has a negative correlation.
+
+
+In order to determine which platforms are best for viewing shows from certain years, the data had to be grouped, summarized then mutated. 
+```{r Year Availability Per Streaming Service}
+data %>% 
+  group_by(Year) %>%
+  summarize(Netflix = sum(Netflix),
+            Hulu = sum(Hulu),
+            PrimeVideo = sum(PrimeVideo),
+            DisneyPlus = sum(DisneyPlus)) %>%
+  pivot_longer(c(Netflix,Hulu,PrimeVideo,DisneyPlus),names_to="platform",values_to = "numMovies") %>%
+  ggplot(aes(x=Year,y=numMovies,fill = platform)) +
+  geom_col() +
+  xlab("Year Released") +
+  ylab("Number of Movies") +
+  facet_wrap(~platform)
+```
+
+When looking at the graph, it can be seen that Prime Video has a vast selection of streaming options from pre-2000, unlike Netflix and Hulu, who can be seen to have most of their content from the last 15 years or so with limited options from pre-2000. Disney+, on the other hand, appears to have a relatively even amount of streaming options from each year. 
+
+In order to plot the runtime of steaming options on each platform, the data had to first be filtered for each platform, then drop missing information.
+```{r, include=FALSE}
+Hulu <- data %>%
+  filter(Hulu == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+Netflix <- data %>%
+  filter(Netflix == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+PrimeVideo <- data %>%
+  filter(PrimeVideo == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+Disney <- data %>%
+  filter(DisneyPlus == 1) %>%
+  select(Runtime) %>%
+  drop_na()
+```
+
+```{r Runtime by Platform}
+ggplot(Hulu,aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on Hulu")
+
+ggplot(PrimeVideo,aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on PrimeVideo")
+
+ggplot(Disney, aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on Disney+")
+
+ggplot(Netflix, aes(x = Runtime)) +
+  geom_boxplot() +
+  ggtitle("Runtime of Streaming Options on Netflix")
+
+```
+
+When looking at the boxplots, you see that the middle 50% appears to be pretty similar for each platform but the outliers for runtime vary greatly by platform.
+```{r, include=FALSE}
+Hulu <- Hulu %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "Hulu")
+Netflix <- Netflix %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "Netflix")
+Disney <- Disney %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "Disney+")
+PrimeVideo <- PrimeVideo %>% summarise(mean = mean(Runtime),
+                   median = median(Runtime),
+                   bottom25 = quantile(Runtime, probs = 0.25),
+                   top25 = quantile(Runtime, probs = 0.75)) %>%
+  mutate(platform = "PrimeVideo")
+```
+
+```{r Runtime Stats by Platform}
+rbind(Netflix,PrimeVideo,Disney,Hulu) %>% select(platform,everything())
+```
+It does not appear that one platform tends to have shorter runtimes over another. 
+
+## Discussion
+
+Overall, our analysis demonstrates some of the key characteristics of four streaming platforms (Netflix, Amazon Prime Video, Disney+, and Hulu), and highlights the differences between the characteristics of these platforms. Our analysis shows that average runtime is very similar across platforms, but Amazon Prime Video and Netflix offer the most streaming options across the largest range of time, but have, for example, more movies targeted at certain age groups (such as 16+ or 18+) and less targeted at other age groups (such as 7 and under). 
+
+With our main question of interest being which streaming platform is the best, our results can be interpreted in different ways depending on what one considered "best". If the best platform should have the most variety across many factors, then the platform that demonstrated the most variety in our analysis would be considered best, which is Amazon Prime Video. However, some may consider the platform with the most videos targeted towards children to be best for them, in which case our analysis shows Disney+ would be considered the "best".
+
+There are a couple potential short-comings of this analysis. First, we analyzed only a few characteristics of these streaming platforms, and there are many other factors that can influence which streaming platform is the best overall. The standards for which streaming platform is the best also varies by person, but we account for this in our discussion of our conclusions. 
+
+For additional work, some new questions include: which platform has the most variety in genres?, which platform has the highest average movie ratings?, and which platform has the most variety in movie languages?. Some different methods to address the same questions include using a hypothesis test to test if the average runtime is consistent across platforms, and/or graph with a bar graph or histogram. Some new data that could be collected to refine our understanding would include updated data on each of these streaming sites, as the number of titles and the kinds of titles may have changed recently, especially with the pandemic. We could also scrape other rating sites to get a larger/more diverse sample of opinions on each of the titles and draw conclusions from this information.
+
+Overall, if the key criteria for best platform emphasize variety in terms of number of titles, time periods, runtimes, and intended audience age, Amazon Prime Video is the best. It has the most titles available by far (12,354), has the most vast selection of streaming options from pre-2000s while also offering current titles, unlike Netflix and Hulu, has some titles with a very long runtime and some with shorter runtimes, and it has some movies targeted at all age groups. So for those who prefer to have a lot of options, Amazon Prime Video is the best platform.
